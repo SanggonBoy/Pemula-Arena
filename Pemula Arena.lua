@@ -86,6 +86,11 @@ local gui=mk('ScreenGui',{Name='PA_HUD',ResetOnSpawn=false,ZIndexBehavior=Enum.Z
 local main=mk('Frame',{Name='Main',AnchorPoint=Vector2.new(0.5,0.5),Size=UDim2.new(0,560,0,400),Position=UDim2.new(0.5,0,0.5,0),BackgroundColor3=Color3.fromRGB(16,18,24),BorderSizePixel=0,Active=true},gui)
 cr(main,12)
 mk('UIStroke',{Color=Color3.fromRGB(60,110,180),Thickness=1.2},main)
+-- Watermark pembuat (pojok kanan-bawah, non-interaktif); ikut sembunyi bersama HUD
+local wm=mk('TextLabel',{Size=UDim2.new(0,240,0,16),Position=UDim2.new(1,-252,1,-22),
+	BackgroundTransparency=1,Text='by Alexander Jay · @absrdme',Font=Enum.Font.Gotham,
+	TextSize=11,TextColor3=Color3.fromRGB(150,160,180),TextTransparency=0.35,
+	TextXAlignment=Enum.TextXAlignment.Right,Active=false,ZIndex=1},gui)
 
 local float=mk('TextButton',{Text='PA',Font=Enum.Font.GothamBold,TextSize=16,TextColor3=Color3.fromRGB(255,255,255),Size=UDim2.new(0,52,0,52),Position=UDim2.new(0,12,0.5,-26),BackgroundColor3=Color3.fromRGB(45,90,160),BorderSizePixel=0,Active=true,AutoButtonColor=true},gui)
 cr(float,26)
@@ -107,12 +112,12 @@ do
 			float.Position=UDim2.new(sp.X.Scale,sp.X.Offset+d.X,sp.Y.Scale,sp.Y.Offset+d.Y)
 		end
 	end)
-	float.MouseButton1Click:Connect(function() if mvd<8 and ENV.PA_GEN==MYGEN then main.Visible=not main.Visible setCursorFree(main.Visible) end end)
+	float.MouseButton1Click:Connect(function() if mvd<8 and ENV.PA_GEN==MYGEN then main.Visible=not main.Visible wm.Visible=main.Visible setCursorFree(main.Visible) end end)
 end
 
 local tb=mk('Frame',{Size=UDim2.new(1,0,0,38),BackgroundColor3=Color3.fromRGB(24,28,38),BorderSizePixel=0},main)
 cr(tb,12)
-mk('TextLabel',{BackgroundTransparency=1,Position=UDim2.new(0,14,0,0),Size=UDim2.new(0.7,0,1,0),Text='🔫 PEMULA ARENA v2',Font=Enum.Font.GothamBold,TextSize=14,TextColor3=Color3.fromRGB(120,180,255),TextXAlignment=Enum.TextXAlignment.Left},tb)
+mk('TextLabel',{BackgroundTransparency=1,Position=UDim2.new(0,14,0,0),Size=UDim2.new(0.85,0,1,0),Text='🔫 PEMULA ARENA v2 · by Alexander Jay (@absrdme)',Font=Enum.Font.GothamBold,TextSize=12,TextColor3=Color3.fromRGB(120,180,255),TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd},tb)
 local bHide=mk('TextButton',{Position=UDim2.new(1,-40,0,7),Size=UDim2.new(0,30,0,24),Text='–',Font=Enum.Font.GothamBold,TextSize=18,TextColor3=Color3.fromRGB(220,220,230),BackgroundColor3=Color3.fromRGB(38,44,58),BorderSizePixel=0},tb)
 cr(bHide,6)
 -- Buka HUD = cursor dibebaskan (game shooter mengunci mouse);
@@ -132,7 +137,7 @@ local function setCursorFree(on)
 		end
 	end)
 end
-bHide.MouseButton1Click:Connect(function() main.Visible=false setCursorFree(false) end)
+bHide.MouseButton1Click:Connect(function() main.Visible=false wm.Visible=false setCursorFree(false) end)
 do
 	local dg,sp,si=false,nil,nil
 	tb.InputBegan:Connect(function(io)
@@ -806,11 +811,29 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- ================= TRIGGERBOT =================
+-- mouse1click = klik OS-level: tembus keluar Roblox bila dipicu saat window tidak
+-- fokus / HUD terbuka / di lobby (bug fatal: spam klik ke Chrome). Guard wajib.
 local trigBusy=false
+local winFocused=true
+pcall(function()
+	UIS.WindowFocused:Connect(function() winFocused=true end)
+	UIS.WindowFocusReleased:Connect(function() winFocused=false end)
+end)
+local function trigGuards()
+	if not winFocused then return false end
+	if main.Visible or CursorFree then return false end
+	local typing=false
+	pcall(function() typing=UIS:GetFocusedTextBox()~=nil end)
+	if typing then return false end
+	local c=lp.Character
+	local h=c and c:FindFirstChildOfClass('Humanoid')
+	if not h or h.Health<=0 then return false end
+	return true
+end
 task.spawn(function()
 	while true do
 		if ENV.PA_GEN~=MYGEN then return end
-		if S.trig and not trigBusy then
+		if S.trig and not trigBusy and trigGuards() then
 			local ok=pcall(function()
 				local cam=Workspace.CurrentCamera
 				if not cam then return end
@@ -822,9 +845,21 @@ task.spawn(function()
 					if m and enemyOK(m,playerOfChar(m)) then
 						trigBusy=true
 						task.wait(S.trigDelay/1000)
-						if mouse1click then pcall(mouse1click)
-						elseif mouse1press and mouse1release then
-							pcall(function() mouse1press() task.wait(0.05) mouse1release() end)
+						local fire=false
+						if trigGuards() then
+							local cam2=Workspace.CurrentCamera
+							if cam2 then
+								rparams.FilterDescendantsInstances={lp.Character}
+								local res2=Workspace:Raycast(cam2.CFrame.Position,cam2.CFrame.LookVector*500,rparams)
+								local m2=res2 and res2.Instance and res2.Instance:FindFirstAncestorOfClass('Model')
+								fire=(m2==m)
+							end
+						end
+						if fire then
+							if mouse1click then pcall(mouse1click)
+							elseif mouse1press and mouse1release then
+								pcall(function() mouse1press() task.wait(0.05) mouse1release() end)
+							end
 						end
 						task.wait(0.15)
 						trigBusy=false
@@ -885,6 +920,7 @@ UIS.InputBegan:Connect(function(io,gp)
 	if ENV.PA_GEN~=MYGEN then return end
 	if io.KeyCode==Enum.KeyCode.Insert or io.KeyCode==Enum.KeyCode.RightShift then
 		main.Visible=not main.Visible
+		wm.Visible=main.Visible
 		setCursorFree(main.Visible)
 	end
 end)
@@ -900,4 +936,4 @@ end)
 ENV.PA_SET=function(k,v) if S[k]==nil then return false end S[k]=v for _,p in ipairs(togPainters[k] or {}) do pcall(p) end if k=='fly' then setFly(v) end return true end
 ENV.PA_GET=function() local c={} for k,v in pairs(S) do c[k]=v end return c end
 
-print('[PA] v2 Loaded! Insert / RightShift = tampil/sembunyi. Tab Tempur: aimbot/triggerbot/ESP.')
+print('[PA] v2 Loaded by Alexander Jay (@absrdme)! Insert / RightShift = tampil/sembunyi. Tab Tempur: aimbot/triggerbot/ESP.')

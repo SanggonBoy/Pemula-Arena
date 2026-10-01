@@ -6,6 +6,12 @@
 -- mungkin tidak berefek; Fly/Teleport tetap jalan.
 -- Toggle: Insert / RightShift / tombol PA. Semua default OFF, tidak menulis
 -- gerakan sebelum user menyentuh slider (pola anti-flicker + anti dobel-jalan).
+-- GUARD: queue_on_teleport Xeno GLOBAL → file bisa dieksekusi di game lain.
+-- PlaceId resmi 17604093381 (wajib persis: universe ini dipakai bersama Arena Tempur).
+if game.PlaceId~=17604093381 then
+	warn('[PA] Dilewati: cheat ini untuk Pemula Arena, bukan game lain (place '..tostring(game.PlaceId)..')')
+	return
+end
 
 local Players=game:GetService('Players')
 local RS=game:GetService('ReplicatedStorage')
